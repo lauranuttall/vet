@@ -56,6 +56,7 @@ def configure_veto_tab(section, parent, state, flags, segmentfile, metrics,
     params.setdefault('union', '|'.join(flags))
     params.setdefault('intersection', '&'.join(flags))
     params.setdefault('states', state.key)
+    params.setdefault('segmentfile', segmentfile)
     params.setdefault('veto-name', params['name'])
     params.setdefault('metrics', ','.join(metrics))
     # set others
@@ -280,6 +281,14 @@ ALLSEGMENTS.write(segfile)
 hveto_files = glob.glob(os.path.join(hveto_loc,'*VETO_SEGS_ROUND*'))
 hveto_flags = DataQualityDict()
 
+# Sort hveto files
+nums = []
+for i, hflags in enumerate(hveto_files):
+    e = CacheEntry.from_T050017(hflags)
+    nums.append(int(e.description.split('_')[-1]))
+nums, hveto_files = zip(*sorted(zip(nums, hveto_files)))
+
+# populate hveto_flags
 for i, hflags in enumerate(hveto_files):
     # parse file name for info
     e = CacheEntry.from_T050017(hflags)
@@ -289,7 +298,7 @@ for i, hflags in enumerate(hveto_files):
     hflag = DataQualityFlag.read(hflags)
     hflag.name = '%s:%s:1' % (ifo, htag)
     hflag.known = [e.segment]
-    hveto_flags[flag.name] = hflag
+    hveto_flags[hflag.name] = hflag
 
 # write segments to new XML file
 hveto_outfile = os.path.abspath('%s-HVETO_FLAG_SEGMENTS-%d-%d.xml'
@@ -347,11 +356,11 @@ for category in categories:
     # define summary tab
     if category == 1:
         tab = configure_veto_tab(
-            title, title, state, hveto_flags.keys(), segfile,
+            title, title, state, hveto_flags.keys(), hveto_outfile,
             metrics, name='Summary', **{'veto-name': title})
     else:
         tab = configure_veto_tab(
-            title, title, state, hveto_flags.keys(), segfile,
+            title, title, state, hveto_flags.keys(), hveto_outfile,
             metrics, name='Summary', **{
                 'veto-name': title,
                 'event-channel':  args.event_channel,
@@ -361,10 +370,10 @@ for category in categories:
         config.set(tab, 'index',
                    '%(gps-start-time)s-%(gps-end-time)s/index.html')
     for key, value in plots:
-        if re.match('%\(flags\)s (?:plot-)?segments', value):
+        if re.match('%\(hveto_flags\)s (?:plot-)?segments', value):
             config.set(tab, key, '%%(union)s,%s' % value)
             if '%s-labels' % key not in plots:
-                config.set(tab, '%s-labels' % key, 'Union,%(flags)s')
+                config.set(tab, '%s-labels' % key, 'Union,%(hveto_flags)s')
         else:
             config.set(tab, key, value)
 
@@ -372,10 +381,10 @@ for category in categories:
     for flag in hveto_flags:
         if category == 1:
             tab = configure_veto_tab(
-                flag, title, state, [flag], segfile, metrics)
+                flag, title, state, [flag], hveto_outfile, metrics)
         else:
             tab = configure_veto_tab(
-                flag, title, state, [flag], segfile, metrics, **{
+                flag, title, state, [flag], hveto_outfile, metrics, **{
                     'event-channel': args.event_channel,
                     'event-generator': args.event_generator})
             if args.event_file:
@@ -393,7 +402,7 @@ if len(categories) > 1:
     state = states[categories[0]]
     add_config_section(config, 'state-%s' % state.key, key=state.key,
                        name=state.name, definition=state.definition,
-                       filename=segfile)
+                       filename=hveto_outfile)
     try:
         plots = pconfig.items('plots', raw=True)
     except NoSectionError:
@@ -401,7 +410,7 @@ if len(categories) > 1:
     hveto_flags = [f for f in hveto_flags.keys()]
     tab = configure_veto_tab(
         'Impact of all hveto', None, state, hveto_flags,
-        segfile, args.metric, shortname='Summary',
+        hveto_outfile, args.metric, shortname='Summary',
         index='%(gps-start-time)s-%(gps-end-time)s/index.html',
         **{'event-channel': args.event_channel,
            'event-generator': args.event_generator,
