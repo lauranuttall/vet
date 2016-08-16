@@ -288,17 +288,35 @@ for i, hflags in enumerate(hveto_files):
     nums.append(int(e.description.split('_')[-1]))
 nums, hveto_files = zip(*sorted(zip(nums, hveto_files)))
 
+# gra round channel names 
+chan_names=[]
+with open(os.path.join(hveto_loc,'summary_stats.txt'), 'r') as filestream:
+    for line in filestream:
+        currentline = line.split(' ')
+        chan_names.append(currentline[1])
+
 # populate hveto_flags
-for i, hflags in enumerate(hveto_files):
-    # parse file name for info
-    e = CacheEntry.from_T050017(hflags)
-    #ifo = e.observatory
-    htag = e.description.replace('_', '-', 1)
+for i, hflags in enumerate(chan_names):
+    # parse name
+    htag = '%s_ROUND_%s' % (hflags,i+1)
     # read segments and replace known
-    hflag = DataQualityFlag.read(hflags)
+    hflag = DataQualityFlag.read(hveto_files[i])
     hflag.name = '%s:%s:1' % (ifo, htag)
+    e = CacheEntry.from_T050017(hveto_files[i])
     hflag.known = [e.segment]
     hveto_flags[hflag.name] = hflag
+
+# populate hveto_flags
+#for i, hflags in enumerate(hveto_files):
+#    # parse file name for info
+#    e = CacheEntry.from_T050017(hflags)
+#    #ifo = e.observatory
+#    htag = e.description.replace('_', '-', 1)
+#    # read segments and replace known
+#    hflag = DataQualityFlag.read(hflags)
+#    hflag.name = '%s:%s:1' % (ifo, htag)
+#    hflag.known = [e.segment]
+#    hveto_flags[hflag.name] = hflag
 
 # write segments to new XML file
 hveto_outfile = os.path.abspath('%s-HVETO_FLAG_SEGMENTS-%d-%d.xml'
@@ -381,10 +399,12 @@ for category in categories:
     for flag in hveto_flags:
         if category == 1:
             tab = configure_veto_tab(
-                flag, title, state, [flag], hveto_outfile, metrics)
+                ('%s-category%s' % (flag,category)), title, state, [flag], 
+                    hveto_outfile, metrics)
         else:
             tab = configure_veto_tab(
-                flag, title, state, [flag], hveto_outfile, metrics, **{
+                ('%s-category%s' % (flag,category)), title, state, [flag], 
+                    hveto_outfile, metrics, **{
                     'event-channel': args.event_channel,
                     'event-generator': args.event_generator})
             if args.event_file:
