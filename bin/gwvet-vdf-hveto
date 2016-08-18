@@ -36,6 +36,12 @@ try:
     IFO = get_default_ifo()
 except ValueError:
     IFO = None
+#DEFAULT_METRICS = ['Deadtime', 'Efficiency', 'Efficiency/Deadtime', 
+#                   'Efficiency | SNR>=8', 'Efficiency/Deadtime | SNR>=8',
+#                   'Efficiency | SNR>=10', 'Efficiency/Deadtime | SNR>=10',
+#                   'Efficiency | SNR>=20', 'Efficiency/Deadtime | SNR>=20',
+#                   'Use percentage', 'Loudest event by SNR']
+
 DEFAULT_METRICS = ['Deadtime', 'Efficiency', 'Efficiency/Deadtime',
                    'Use percentage', 'Loudest event by SNR']
 
@@ -67,17 +73,6 @@ def configure_veto_tab(section, parent, state, flags, segmentfile, metrics,
     for key, val in params.iteritems():
         config.set(tab, key, val)
     return tab
-
-#vetofile = 'https://code.pycbc.phy.syr.edu/detchar/veto-definitions/download/8c93f3d3db8cb8f88c25c249d2e81caae6e4cdf9/cbc/O1/H1L1-CBC_VETO_DEFINER_C02_O1_1126051217-11203200.xml'
-#start = to_gps(1126051217)
-#end = to_gps(1137254417)
-#ifo = 'H1'
-#segdb = 'https://segments.ligo.org'
-#on_segdb_error = 'raise'
-#categories = '1,2,3' 
-#analysis_name = 'Analysis'
-#analysis_segments = ['H1:DCS-ANALYSIS_READY_C02:1']
-#hveto_loc = '/home/jrsmith/public_html/hveto/O1/analysis9/H1-omicron_BOTH-1135652417-1602000-DARM/'
 
 # -----------------------------------------------------------------------------
 #
@@ -298,10 +293,10 @@ with open(os.path.join(hveto_loc,'summary_stats.txt'), 'r') as filestream:
 # populate hveto_flags
 for i, hflags in enumerate(chan_names):
     # parse name
-    htag = '%s_ROUND_%s' % (hflags,i+1)
+    htag = '%s:ROUND-%s_%s' % (ifo, i+1, hflags.replace('-', '_'))
     # read segments and replace known
     hflag = DataQualityFlag.read(hveto_files[i])
-    hflag.name = '%s:%s:1' % (ifo, htag)
+    hflag.name = '%s:1' % (htag)
     e = CacheEntry.from_T050017(hveto_files[i])
     hflag.known = [e.segment]
     hveto_flags[hflag.name] = hflag
@@ -366,24 +361,25 @@ for category in categories:
     add_config_section(config, 'plugins', **{'gwvet.tabs': ''})
 
     # define metrics
-    if category == 1:
-        metrics = ['Deadtime']
-    else:
-        metrics = args.metric
+    #if category == 1:
+    #    metrics = ['Deadtime']
+    #else:
+    #    metrics = args.metric
+    metrics = args.metric
 
     # define summary tab
-    if category == 1:
-        tab = configure_veto_tab(
-            title, title, state, hveto_flags.keys(), hveto_outfile,
-            metrics, name='Summary', **{'veto-name': title})
-    else:
-        tab = configure_veto_tab(
-            title, title, state, hveto_flags.keys(), hveto_outfile,
-            metrics, name='Summary', **{
-                'veto-name': title,
-                'event-channel':  args.event_channel,
-                'event-generator': args.event_generator,
-            })
+    #if category == 1:
+    #    tab = configure_veto_tab(
+    #        title, title, state, hveto_flags.keys(), hveto_outfile,
+    #        metrics, name='Summary', **{'veto-name': title})
+    #else:
+    tab = configure_veto_tab(
+        title, title, state, hveto_flags.keys(), hveto_outfile,
+        metrics, name='Summary', **{
+            'veto-name': title,
+            'event-channel':  args.event_channel,
+            'event-generator': args.event_generator,
+        })
     if len(categories) == 1:
         config.set(tab, 'index',
                    '%(gps-start-time)s-%(gps-end-time)s/index.html')
@@ -397,18 +393,18 @@ for category in categories:
 
     # now a tab for each flag
     for flag in hveto_flags:
-        if category == 1:
-            tab = configure_veto_tab(
-                ('%s-category%s' % (flag,category)), title, state, [flag], 
-                    hveto_outfile, metrics)
-        else:
-            tab = configure_veto_tab(
-                ('%s-category%s' % (flag,category)), title, state, [flag], 
-                    hveto_outfile, metrics, **{
-                    'event-channel': args.event_channel,
-                    'event-generator': args.event_generator})
-            if args.event_file:
-                config.set(tab, 'event-file', args.event_file)
+        #if category == 1:
+        #    tab = configure_veto_tab(
+        #        ('%s-category%s' % (flag,category)), title, state, [flag], 
+        #            hveto_outfile, metrics)
+        #else:
+        tab = configure_veto_tab(
+            ('%s-category%s' % (flag,category)), title, state, [flag], 
+                hveto_outfile, metrics, **{
+                'event-channel': args.event_channel,
+                'event-generator': args.event_generator})
+        if args.event_file:
+            config.set(tab, 'event-file', args.event_file)
         for key, value in plots:
             config.set(tab, key, value)
 
